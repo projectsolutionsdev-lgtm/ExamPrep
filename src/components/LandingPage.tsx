@@ -213,7 +213,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Academic Department Pill */}
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 text-[11px] sm:text-xs font-bold shadow-xs max-w-full">
               <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="truncate">Department of Information Technology • Academic Project</span>
+              <span className="truncate">Department of Computer Science • B.Sc. CS Academic Project</span>
             </div>
 
             {/* Main Headline */}

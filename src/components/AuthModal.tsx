@@ -188,7 +188,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     />
                     <div>
                       <h4 className="font-bold text-sm text-slate-900 dark:text-white">Rishabh</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Roll #101 • TYIT B • rishabh@gmail.com</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Roll #101 • TYBSc CS • rishabh@gmail.com</p>
                       <span className="inline-block mt-1 px-2 py-0.5 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 rounded text-[10px] font-bold">
                         Demo Candidate · Target: UPSC
                       </span>

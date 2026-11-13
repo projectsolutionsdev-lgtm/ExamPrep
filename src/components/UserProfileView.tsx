@@ -15,10 +15,7 @@ import {
   ShieldCheck,
   FileText,
   HelpCircle,
-  TrendingUp,
-  Copy,
-  Check,
-  Key
+  TrendingUp
 } from 'lucide-react';
 import { saveUserProfile } from '../data/storage';
 import { Avatar } from './Avatar';
@@ -50,16 +47,6 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [targetExam, setTargetExam] = useState<ExamCategory>(user.targetExam);
   const [avatar, setAvatar] = useState(user.avatar);
   const [savedMsg, setSavedMsg] = useState('');
-  const [copiedSession, setCopiedSession] = useState(false);
-
-  const handleCopySession = () => {
-    const sid = user.sessionId || 'SES-2026-NMF-8924A';
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(sid);
-      setCopiedSession(true);
-      setTimeout(() => setCopiedSession(false), 2000);
-    }
-  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,16 +107,6 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-bold flex items-center gap-1">
                 <Flame className="w-3.5 h-3.5 text-amber-500" /> {user.streakDays} Days Streak
               </span>
-              <button
-                type="button"
-                onClick={handleCopySession}
-                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-600 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Click to copy Session ID"
-              >
-                <Key className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>Session: {user.sessionId || 'SES-2026-NMF-8924A'}</span>
-                {copiedSession ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <Copy className="w-3 h-3 text-slate-400 shrink-0" />}
-              </button>
             </div>
           </div>
         </div>
@@ -421,15 +398,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <p className="font-bold text-slate-900 dark:text-white text-sm">
               Nirmala Memorial Foundation College of Commerce and Science (Autonomous)
             </p>
-            <p className="text-slate-500 dark:text-slate-400">Department of Information Technology</p>
-            <p className="text-slate-500 dark:text-slate-400">B.Sc.I.T Degree Programme • Semester V • Academic Year 2026-27</p>
+            <p className="text-slate-500 dark:text-slate-400">Department of Computer Science</p>
+            <p className="text-slate-500 dark:text-slate-400">B.Sc. CS Degree Programme • Semester V • Academic Year 2026-27</p>
           </div>
 
           <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700">
             <h4 className="font-bold text-cyan-800 dark:text-cyan-400 uppercase tracking-wider text-[11px]">Candidate & Academic Details</h4>
             <p className="text-slate-700 dark:text-slate-300"><strong className="text-slate-900 dark:text-white">Project Title:</strong> Competitive Exam and Current Affairs Mock Test Portal</p>
             <p className="text-slate-700 dark:text-slate-300"><strong className="text-slate-900 dark:text-white">Active Candidate:</strong> {user.name} (Roll #{user.rollNo})</p>
-            <p className="text-slate-700 dark:text-slate-300"><strong className="text-slate-900 dark:text-white">Programme:</strong> B.Sc.I.T • Academic Year {user.academicYear}</p>
+            <p className="text-slate-700 dark:text-slate-300"><strong className="text-slate-900 dark:text-white">Programme:</strong> B.Sc. CS • Academic Year {user.academicYear}</p>
           </div>
         </div>
       </div>

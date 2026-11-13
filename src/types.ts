@@ -165,7 +165,6 @@ export interface SectionResult {
 
 export interface TestAttempt {
   id: string;
-  sessionId?: string; // Unique exam examination session token (e.g. EXAM-SES-2026-X821)
   testId: string;
   testTitle: string;
   examCategory: ExamCategory | string;
@@ -202,7 +201,6 @@ export interface TestAttempt {
 
 export interface UserProfile {
   id: string;
-  sessionId?: string; // Active student / portal session ID (e.g. SES-2026-NMF-8924A)
   name: string;
   rollNo: string;
   className: string;
@@ -214,6 +212,8 @@ export interface UserProfile {
   role: 'student' | 'admin';
   streakDays: number;
   lastActiveDate: string;
+  caBookmarks?: string[];
+  questionBookmarks?: string[];
 }
 
 export interface UserStats {
@@ -230,7 +230,10 @@ export interface AdminAnalytics {
   totalStudents: number;
   totalTestsAttempted: number;
   averageScorePercentage: number;
+  completionRatePercentage?: number;
   topPerformingExam: string;
   totalQuestionsInBank: number;
   totalCurrentAffairsPosts: number;
+  totalMockTests?: number;
+  source?: 'mongodb-atlas' | 'local';
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CurrentAffairsItem, CurrentAffairsCategory } from '../types';
 import { 
   BookOpen, 
@@ -24,13 +24,17 @@ interface CurrentAffairsModuleProps {
   bookmarks: string[];
   onBookmarkChange: () => void;
   onLaunchQuickQuiz?: (caItem: CurrentAffairsItem) => void;
+  initialArticleId?: string | null;
+  onClearInitialArticle?: () => void;
 }
 
 export const CurrentAffairsModule: React.FC<CurrentAffairsModuleProps> = ({
   currentAffairs,
   bookmarks,
   onBookmarkChange,
-  onLaunchQuickQuiz
+  onLaunchQuickQuiz,
+  initialArticleId,
+  onClearInitialArticle
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -40,6 +44,18 @@ export const CurrentAffairsModule: React.FC<CurrentAffairsModuleProps> = ({
   // Selected option state for the embedded practice question inside article modal
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialArticleId) {
+      const target = currentAffairs.find(item => item.id === initialArticleId);
+      if (target) {
+        setActiveArticle(target);
+        setSelectedOption(null);
+        setShowAnswer(false);
+      }
+      onClearInitialArticle?.();
+    }
+  }, [initialArticleId, currentAffairs, onClearInitialArticle]);
 
   const categories: (CurrentAffairsCategory | 'All')[] = [
     'All',
@@ -53,16 +69,21 @@ export const CurrentAffairsModule: React.FC<CurrentAffairsModuleProps> = ({
     'International'
   ];
 
-  const filteredArticles = currentAffairs.filter(item => {
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    const matchesSearch = 
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesMonth = selectedMonth === 'All' || item.date.startsWith(selectedMonth);
+  const bookmarkSet = useMemo(() => new Set(bookmarks), [bookmarks]);
 
-    return matchesCategory && matchesSearch && matchesMonth;
-  });
+  const filteredArticles = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return currentAffairs.filter(item => {
+      if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
+      if (selectedMonth !== 'All' && !item.date.startsWith(selectedMonth)) return false;
+      if (!query) return true;
+      return (
+        item.title.toLowerCase().includes(query) ||
+        item.summary.toLowerCase().includes(query) ||
+        item.tags.some(t => t.toLowerCase().includes(query))
+      );
+    });
+  }, [currentAffairs, selectedCategory, searchTerm, selectedMonth]);
 
   const handleOpenArticle = (item: CurrentAffairsItem) => {
     setActiveArticle(item);
@@ -158,7 +179,7 @@ export const CurrentAffairsModule: React.FC<CurrentAffairsModuleProps> = ({
       {/* Articles Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredArticles.map((item) => {
-          const isSaved = bookmarks.includes(item.id);
+          const isSaved = bookmarkSet.has(item.id);
 
           return (
             <div
@@ -269,13 +290,13 @@ export const CurrentAffairsModule: React.FC<CurrentAffairsModuleProps> = ({
                 <button
                   onClick={(e) => handleToggleBookmark(activeArticle.id, e)}
                   className={`min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2 rounded-xl border transition-colors cursor-pointer ${
-                    bookmarks.includes(activeArticle.id)
+                    bookmarkSet.has(activeArticle.id)
                       ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                   title="Bookmark Article"
                 >
-                  <Bookmark className={`w-4 h-4 ${bookmarks.includes(activeArticle.id) ? 'fill-amber-600 dark:fill-amber-400 text-amber-600 dark:text-amber-400' : ''}`} />
+                  <Bookmark className={`w-4 h-4 ${bookmarkSet.has(activeArticle.id) ? 'fill-amber-600 dark:fill-amber-400 text-amber-600 dark:text-amber-400' : ''}`} />
                 </button>
                 <button
                   onClick={() => setActiveArticle(null)}

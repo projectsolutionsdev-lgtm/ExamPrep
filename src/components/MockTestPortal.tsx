@@ -17,16 +17,17 @@ import {
   X,
   Sliders,
   Sparkles,
-  Zap,
-  Key,
-  Copy,
-  Check
+  Zap
 } from 'lucide-react';
 
 interface MockTestPortalProps {
   mockTests: MockTest[];
   user?: UserProfile;
-  onStartTest: (test: MockTest, selectedCategory: keyof CategoryCutoffs) => void;
+  onStartTest: (
+    test: MockTest,
+    selectedCategory: keyof CategoryCutoffs,
+    timerMode?: 'overall' | 'sectional'
+  ) => void;
 }
 
 export const MockTestPortal: React.FC<MockTestPortalProps> = ({
@@ -38,21 +39,11 @@ export const MockTestPortal: React.FC<MockTestPortalProps> = ({
   const [selectedTestForInstructions, setSelectedTestForInstructions] = useState<MockTest | null>(null);
   const [candidateCategory, setCandidateCategory] = useState<keyof CategoryCutoffs>('UR');
   const [instructionsAccepted, setInstructionsAccepted] = useState<boolean>(false);
-  const [copiedSession, setCopiedSession] = useState<boolean>(false);
-  
-  const handleCopySession = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const sid = user?.sessionId || 'SES-2026-NMF-8924A';
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(sid);
-      setCopiedSession(true);
-      setTimeout(() => setCopiedSession(false), 2000);
-    }
-  };
   
   // Custom Timer Preference for selected test
   const [selectedTimerMinutes, setSelectedTimerMinutes] = useState<number>(60);
   const [customTimerInput, setCustomTimerInput] = useState<string>('');
+  const [timerMode, setTimerMode] = useState<'overall' | 'sectional'>('overall');
   const [validationError, setValidationError] = useState<string>('');
 
   const categories = [
@@ -74,6 +65,7 @@ export const MockTestPortal: React.FC<MockTestPortalProps> = ({
     setSelectedTestForInstructions(test);
     setSelectedTimerMinutes(test.overallTimeLimitMinutes || 60);
     setCustomTimerInput('');
+    setTimerMode('overall');
     setInstructionsAccepted(false);
     setValidationError('');
   };
@@ -91,7 +83,7 @@ export const MockTestPortal: React.FC<MockTestPortalProps> = ({
       overallTimeLimitMinutes: selectedTimerMinutes
     };
 
-    onStartTest(updatedTest, candidateCategory);
+    onStartTest(updatedTest, candidateCategory, timerMode);
     setSelectedTestForInstructions(null);
   };
 
@@ -114,25 +106,6 @@ export const MockTestPortal: React.FC<MockTestPortalProps> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 relative z-10">
-          {user && (
-            <button
-              type="button"
-              onClick={handleCopySession}
-              className="p-3 sm:p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-left hover:border-amber-400 transition-colors cursor-pointer"
-              title="Candidate Portal Session ID (Tap to Copy)"
-            >
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                <Key className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                <span>Candidate Session</span>
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-xs sm:text-sm font-mono font-bold text-amber-900 dark:text-amber-300">
-                  {user.sessionId || 'SES-2026-NMF-8924A'}
-                </span>
-                {copiedSession ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-              </div>
-            </button>
-          )}
 
           <div className="p-3 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
             <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Available Tests</span>
@@ -256,18 +229,6 @@ export const MockTestPortal: React.FC<MockTestPortalProps> = ({
                   <span className="text-amber-800 dark:text-amber-400 font-extrabold uppercase tracking-wider text-[11px]">
                     {selectedTestForInstructions.examCategory}
                   </span>
-                  {user && (
-                    <button
-                      type="button"
-                      onClick={handleCopySession}
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-[10px] font-mono font-bold text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 cursor-pointer shadow-2xs"
-                      title="Session ID attached to this exam (Click to copy)"
-                    >
-                      <Key className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
-                      <span>Session: {user.sessionId || 'SES-2026-NMF-8924A'}</span>
-                      {copiedSession ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5 text-slate-400" />}
-                    </button>
-                  )}
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white font-serif">
                   {selectedTestForInstructions.title}
@@ -337,6 +298,45 @@ export const MockTestPortal: React.FC<MockTestPortalProps> = ({
                     }}
                     className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 sm:py-1.5 text-sm sm:text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-amber-500 font-mono"
                   />
+                </div>
+
+                {/* Optional Timer Discipline Mode */}
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                    <span>Section Navigation &amp; Timer Mode:</span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTimerMode('overall')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        timerMode === 'overall'
+                          ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 text-slate-900 dark:text-white ring-1 ring-amber-500/40'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      <span className="block font-bold text-xs">Flexible Overall Timer</span>
+                      <span className="block text-[10px] opacity-80 mt-0.5">
+                        Switch freely across all sections within {selectedTimerMinutes} mins.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTimerMode('sectional')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        timerMode === 'sectional'
+                          ? 'bg-cyan-50 dark:bg-cyan-950/50 border-cyan-500 text-slate-900 dark:text-white ring-1 ring-cyan-500/40'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      <span className="block font-bold text-xs">Strict Sectional Timers</span>
+                      <span className="block text-[10px] opacity-80 mt-0.5">
+                        Dedicated countdown &amp; section lock per section ({selectedTestForInstructions.sections?.length || 1} section{(selectedTestForInstructions.sections?.length || 1) > 1 ? 's' : ''}).
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

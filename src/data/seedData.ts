@@ -3,10 +3,9 @@ import { ALL_NEW_MOCK_TESTS, ALL_NEW_QUESTIONS } from './allExamPapersData';
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   id: 'student-2026-01',
-  sessionId: 'SES-2026-NMF-8924A',
   name: 'Rishabh',
   rollNo: '101',
-  className: 'TYIT B',
+  className: 'TYBSc CS',
   academicYear: '2026-27',
   email: 'rishabh@gmail.com',
   institute: 'Nirmala Memorial Foundation College of Commerce and Science (Autonomous)',
@@ -19,10 +18,9 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
 
 export const SECONDARY_STUDENT_PROFILE: UserProfile = {
   id: 'student-2026-02',
-  sessionId: 'SES-2026-NMF-9102B',
   name: 'Rishabh',
   rollNo: '101',
-  className: 'TYIT B',
+  className: 'TYBSc CS',
   academicYear: '2026-27',
   email: 'rishabh@gmail.com',
   institute: 'Nirmala Memorial Foundation College of Commerce and Science (Autonomous)',
@@ -35,7 +33,6 @@ export const SECONDARY_STUDENT_PROFILE: UserProfile = {
 
 export const ADMIN_USER_PROFILE: UserProfile = {
   id: 'faculty-admin-01',
-  sessionId: 'SES-2026-ADM-001X',
   name: 'Admin',
   rollNo: 'ADMIN-01',
   className: 'Administration',
@@ -1923,7 +1920,6 @@ export const INITIAL_MOCK_TESTS: MockTest[] = [...BASE_MOCK_TESTS, ...ALL_NEW_MO
 export const SEED_TEST_ATTEMPTS: TestAttempt[] = [
   {
     id: 'attempt-upsc-01',
-    sessionId: 'EXAM-SES-2026-9481A',
     testId: 'mock-upsc-prelims-2026',
     testTitle: 'UPSC Civil Services Prelims Mock Exam 2026 (GS Paper-1)',
     examCategory: 'UPSC Civil Services',
@@ -2011,7 +2007,6 @@ export const SEED_TEST_ATTEMPTS: TestAttempt[] = [
   },
   {
     id: 'attempt-ssc-02',
-    sessionId: 'EXAM-SES-2026-7123B',
     testId: 'mock-ssc-cgl-2026',
     testTitle: 'SSC CGL Tier-1 All India Grand Mock Test 2026',
     examCategory: 'SSC (CGL/CHSL/MTS)',

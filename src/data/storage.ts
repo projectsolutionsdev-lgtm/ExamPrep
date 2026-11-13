@@ -1,18 +1,17 @@
-import { 
-  Question, 
-  MockTest, 
-  TestAttempt, 
-  UserStats, 
-  CurrentAffairsItem, 
-  UserProfile, 
+import {
+  Question,
+  MockTest,
+  TestAttempt,
+  UserStats,
+  CurrentAffairsItem,
+  UserProfile,
   AdminAnalytics
 } from '../types';
-import { 
-  SEED_QUESTIONS, 
-  INITIAL_MOCK_TESTS, 
-  SEED_CURRENT_AFFAIRS, 
+import {
+  SEED_QUESTIONS,
+  INITIAL_MOCK_TESTS,
+  SEED_CURRENT_AFFAIRS,
   DEFAULT_USER_PROFILE,
-  SECONDARY_STUDENT_PROFILE,
   ADMIN_USER_PROFILE,
   SEED_TEST_ATTEMPTS
 } from './seedData';
@@ -24,94 +23,77 @@ const STORAGE_KEYS = {
   CURRENT_AFFAIRS: 'ce_current_affairs_v6',
   USER_PROFILE: 'ce_user_profile_v6',
   CA_BOOKMARKS: 'ce_ca_bookmarks_v6',
-  QUESTION_BOOKMARKS: 'ce_q_bookmarks_v6',
-  STUDENT_LIST: 'ce_students_list_v6',
-  SESSION_ID: 'ce_portal_session_id_v6'
+  QUESTION_BOOKMARKS: 'ce_q_bookmarks_v6'
+} as const;
+
+const LEGACY_DUMMY_EMAILS = new Set([
+  'shivraj.gond@nirmala.edu.in',
+  'chris.anthony@nirmala.edu.in',
+  'admin@nirmala.edu.in',
+  'student@nmf.edu.in',
+  'student@nirmala.edu.in'
+]);
+
+const LEGACY_STUDENT_NAMES = new Set(['Shivraj Gond', 'Chris Anthony']);
+
+interface StorageCache {
+  userProfile?: UserProfile;
+  questions?: Question[];
+  currentAffairs?: CurrentAffairsItem[];
+  caBookmarks?: string[];
+  questionBookmarks?: string[];
+  mockTests?: MockTest[];
+  attempts?: TestAttempt[];
+}
+
+// In-memory read-through cache to eliminate redundant localStorage reads & JSON.parse allocations
+const memoryCache: StorageCache = {};
+
+// --- Low-Level Storage & API Helpers ---
+
+const writeStorage = <K extends keyof StorageCache>(
+  key: string,
+  cacheField: K,
+  value: NonNullable<StorageCache[K]>
+): void => {
+  memoryCache[cacheField] = value;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore quota / private mode storage errors; in-memory cache remains valid
+  }
 };
 
-// --- Session ID Generators & Helpers ---
+const readCachedStorage = <K extends keyof StorageCache>(
+  key: string,
+  cacheField: K,
+  fallback: NonNullable<StorageCache[K]>,
+  persistIfMissing: boolean = true
+): NonNullable<StorageCache[K]> => {
+  const cached = memoryCache[cacheField];
+  if (cached !== undefined) {
+    return cached as NonNullable<StorageCache[K]>;
+  }
 
-export const getPortalSessionId = (): string => {
   try {
-    let sid = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
-    if (!sid) {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let rand = '';
-      for (let i = 0; i < 5; i++) {
-        rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    const raw = localStorage.getItem(key);
+    if (!raw) {
+      if (persistIfMissing) {
+        writeStorage(key, cacheField, fallback);
+      } else {
+        memoryCache[cacheField] = fallback;
       }
-      sid = `SES-2026-NMF-${rand}`;
-      localStorage.setItem(STORAGE_KEYS.SESSION_ID, sid);
+      return fallback;
     }
-    return sid;
-  } catch (e) {
-    return 'SES-2026-NMF-8924A';
-  }
-};
 
-export const generateExamSessionId = (tag?: string): string => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let rand = '';
-  for (let i = 0; i < 4; i++) {
-    rand += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  const num = Math.floor(1000 + Math.random() * 9000);
-  return `EXAM-SES-${num}-${rand}`;
-};
-
-// --- User Profile & Auth ---
-
-export const getUserProfile = (): UserProfile => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
-    if (!data) {
-      const defaultProf = { ...DEFAULT_USER_PROFILE, sessionId: getPortalSessionId() };
-      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(defaultProf));
-      return defaultProf;
-    }
-    const parsed: UserProfile = JSON.parse(data);
-    let modified = false;
-    if (!parsed.sessionId) {
-      parsed.sessionId = getPortalSessionId();
-      modified = true;
-    }
-    if (parsed.avatar && parsed.avatar.includes('images.unsplash.com')) {
-      parsed.avatar = '';
-      modified = true;
-    }
-    if (parsed.role === 'admin' && parsed.name !== 'Admin') {
-      parsed.name = 'Admin';
-      parsed.email = '';
-      parsed.avatar = '';
-      modified = true;
-    }
-    if (parsed.name === 'Shivraj Gond' || parsed.name === 'Chris Anthony') {
-      parsed.name = 'Rishabh';
-      parsed.rollNo = '101';
-      parsed.email = 'rishabh@gmail.com';
-      modified = true;
-    }
-    const legacyDummyEmails = [
-      'shivraj.gond@nirmala.edu.in',
-      'chris.anthony@nirmala.edu.in',
-      'admin@nirmala.edu.in',
-      'student@nmf.edu.in',
-      'student@nirmala.edu.in'
-    ];
-    if (parsed.email && legacyDummyEmails.includes(parsed.email)) {
-      parsed.email = parsed.role === 'student' ? 'rishabh@gmail.com' : '';
-      modified = true;
-    }
-    if (modified) {
-      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(parsed));
-    }
+    const parsed = JSON.parse(raw) as NonNullable<StorageCache[K]>;
+    memoryCache[cacheField] = parsed;
     return parsed;
-  } catch (e) {
-    return { ...DEFAULT_USER_PROFILE, sessionId: getPortalSessionId() };
+  } catch {
+    memoryCache[cacheField] = fallback;
+    return fallback;
   }
 };
-
-// --- MongoDB Atlas Background Synchronization Helpers ---
 
 const safeApiCall = async (url: string, options?: RequestInit) => {
   try {
@@ -122,281 +104,335 @@ const safeApiCall = async (url: string, options?: RequestInit) => {
         ...(options?.headers || {})
       }
     });
-    if (!res.ok) return null;
-    return await res.json();
+    return res.ok ? await res.json() : null;
   } catch {
     // Graceful fallback to offline/cached mode
     return null;
   }
 };
 
-export const fetchMongoDBStatus = async () => {
-  const data = await safeApiCall('/api/status');
-  return data?.database || {
-    database: 'MongoDB Atlas',
-    status: 'disconnected',
-    isConnected: false,
-    uriConfigured: false,
-    lastError: 'Local database cache active'
-  };
+const migrateLegacyProfile = (profile: UserProfile): { profile: UserProfile; modified: boolean } => {
+  let modified = false;
+  const next = { ...profile };
+
+  if (next.avatar?.includes('images.unsplash.com')) {
+    next.avatar = '';
+    modified = true;
+  }
+  if (next.role === 'admin' && next.name !== 'Admin') {
+    next.name = 'Admin';
+    next.email = '';
+    next.avatar = '';
+    modified = true;
+  }
+  if (next.className === 'TYIT B' || next.className === 'B.Sc. IT') {
+    next.className = 'TYBSc CS';
+    modified = true;
+  }
+  if (LEGACY_STUDENT_NAMES.has(next.name)) {
+    next.name = 'Rishabh';
+    next.rollNo = '101';
+    next.email = 'rishabh@gmail.com';
+    modified = true;
+  }
+  if (next.email && LEGACY_DUMMY_EMAILS.has(next.email)) {
+    next.email = next.role === 'student' ? 'rishabh@gmail.com' : '';
+    modified = true;
+  }
+
+  return { profile: next, modified };
+};
+
+// --- User Profile & Authentication ---
+
+export const getUserProfile = (): UserProfile => {
+  if (memoryCache.userProfile) return memoryCache.userProfile;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+    if (!raw) {
+      const defaultProf = { ...DEFAULT_USER_PROFILE };
+      writeStorage(STORAGE_KEYS.USER_PROFILE, 'userProfile', defaultProf);
+      return defaultProf;
+    }
+
+    const { profile, modified } = migrateLegacyProfile(JSON.parse(raw) as UserProfile);
+    if (modified) {
+      writeStorage(STORAGE_KEYS.USER_PROFILE, 'userProfile', profile);
+    } else {
+      memoryCache.userProfile = profile;
+    }
+    return profile;
+  } catch {
+    const fallback = { ...DEFAULT_USER_PROFILE };
+    memoryCache.userProfile = fallback;
+    return fallback;
+  }
 };
 
 export const saveUserProfile = (profile: UserProfile): void => {
-  localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
-  // Background sync to MongoDB Atlas
+  const enriched: UserProfile = {
+    ...profile,
+    caBookmarks: profile.caBookmarks ?? getCABookmarks(),
+    questionBookmarks: profile.questionBookmarks ?? getQuestionBookmarks()
+  };
+
+  writeStorage(STORAGE_KEYS.USER_PROFILE, 'userProfile', enriched);
   safeApiCall('/api/user-profile', {
     method: 'POST',
-    body: JSON.stringify(profile)
+    body: JSON.stringify(enriched)
   });
 };
 
 export const switchStudentPersona = (persona: 'rishabh' | 'admin'): UserProfile => {
-  let profile: UserProfile;
-  if (persona === 'rishabh') {
-    profile = { ...DEFAULT_USER_PROFILE, role: 'student' };
-  } else {
-    profile = { ...ADMIN_USER_PROFILE, role: 'admin' };
-  }
-  profile.sessionId = profile.sessionId || getPortalSessionId();
+  const profile: UserProfile =
+    persona === 'rishabh'
+      ? { ...DEFAULT_USER_PROFILE, role: 'student' }
+      : { ...ADMIN_USER_PROFILE, role: 'admin' };
+
   saveUserProfile(profile);
   return profile;
 };
 
-// --- Questions Bank CRUD ---
+// --- MongoDB Atlas Status & Startup Hydration ---
 
-export const getAllQuestions = (): Question[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.QUESTIONS);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(SEED_QUESTIONS));
-      return SEED_QUESTIONS;
+export const fetchMongoDBStatus = async () => {
+  const data = await safeApiCall('/api/status');
+  return (
+    data?.database || {
+      database: 'MongoDB Atlas',
+      status: 'disconnected',
+      isConnected: false,
+      uriConfigured: false,
+      lastError: 'Local database cache active'
     }
-    return JSON.parse(data);
-  } catch (e) {
-    console.error('Error reading questions from localStorage', e);
-    return SEED_QUESTIONS;
-  }
+  );
 };
 
+export const hydrateFromMongoDB = async (): Promise<boolean> => {
+  const currentUser = getUserProfile();
+  const res = await safeApiCall(`/api/bootstrap?userId=${encodeURIComponent(currentUser.id)}`);
+  if (!res?.connected) return false;
+
+  // Fresh empty cluster: seed once from default/local records
+  if (res.isEmptyCluster) {
+    const enrichedUser: UserProfile = {
+      ...currentUser,
+      caBookmarks: getCABookmarks(),
+      questionBookmarks: getQuestionBookmarks()
+    };
+
+    await safeApiCall('/api/sync-seed', {
+      method: 'POST',
+      body: JSON.stringify({
+        questions: getAllQuestions(),
+        currentAffairs: getAllCurrentAffairs(),
+        mockTests: getMockTests(),
+        attempts: getTestAttempts(),
+        profile: enrichedUser
+      })
+    });
+    return true;
+  }
+
+  if (Array.isArray(res.questions) && res.questions.length > 0) {
+    writeStorage(STORAGE_KEYS.QUESTIONS, 'questions', res.questions);
+  }
+  if (Array.isArray(res.currentAffairs) && res.currentAffairs.length > 0) {
+    writeStorage(STORAGE_KEYS.CURRENT_AFFAIRS, 'currentAffairs', res.currentAffairs);
+  }
+  if (Array.isArray(res.mockTests) && res.mockTests.length > 0) {
+    writeStorage(STORAGE_KEYS.MOCK_TESTS, 'mockTests', res.mockTests);
+  }
+  if (Array.isArray(res.attempts) && res.attempts.length > 0) {
+    writeStorage(STORAGE_KEYS.ATTEMPTS, 'attempts', res.attempts);
+  }
+
+  if (res.profile?.id) {
+    writeStorage(STORAGE_KEYS.USER_PROFILE, 'userProfile', res.profile);
+    if (Array.isArray(res.profile.caBookmarks)) {
+      writeStorage(STORAGE_KEYS.CA_BOOKMARKS, 'caBookmarks', res.profile.caBookmarks);
+    }
+    if (Array.isArray(res.profile.questionBookmarks)) {
+      writeStorage(STORAGE_KEYS.QUESTION_BOOKMARKS, 'questionBookmarks', res.profile.questionBookmarks);
+    }
+  } else {
+    saveUserProfile(currentUser);
+  }
+
+  return true;
+};
+
+// --- Question Bank CRUD ---
+
+export const getAllQuestions = (): Question[] =>
+  readCachedStorage(STORAGE_KEYS.QUESTIONS, 'questions', SEED_QUESTIONS);
+
 export const saveCustomQuestion = (newQ: Omit<Question, 'id'>): Question => {
-  const all = getAllQuestions();
   const created: Question = {
     ...newQ,
     id: `custom-cq-${Date.now()}`,
     dateAdded: new Date().toISOString().split('T')[0]
   };
-  const updated = [created, ...all];
-  localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(updated));
-
-  // Sync to MongoDB Atlas
-  safeApiCall('/api/questions', {
-    method: 'POST',
-    body: JSON.stringify(created)
-  });
-
+  writeStorage(STORAGE_KEYS.QUESTIONS, 'questions', [created, ...getAllQuestions()]);
+  safeApiCall('/api/questions', { method: 'POST', body: JSON.stringify(created) });
   return created;
 };
 
 export const updateQuestion = (updatedQ: Question): void => {
   const all = getAllQuestions();
   const idx = all.findIndex(q => q.id === updatedQ.id);
-  if (idx >= 0) {
-    all[idx] = updatedQ;
-    localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(all));
-    safeApiCall('/api/questions', {
-      method: 'POST',
-      body: JSON.stringify(updatedQ)
-    });
-  }
+  if (idx < 0) return;
+
+  const next = [...all];
+  next[idx] = updatedQ;
+  writeStorage(STORAGE_KEYS.QUESTIONS, 'questions', next);
+  safeApiCall('/api/questions', { method: 'POST', body: JSON.stringify(updatedQ) });
 };
 
 export const deleteCustomQuestion = (id: string): void => {
-  const all = getAllQuestions().filter(q => q.id !== id);
-  localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(all));
+  const filtered = getAllQuestions().filter(q => q.id !== id);
+  writeStorage(STORAGE_KEYS.QUESTIONS, 'questions', filtered);
   safeApiCall(`/api/questions/${id}`, { method: 'DELETE' });
 };
 
 // --- Current Affairs CRUD ---
 
-export const getAllCurrentAffairs = (): CurrentAffairsItem[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.CURRENT_AFFAIRS);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_AFFAIRS, JSON.stringify(SEED_CURRENT_AFFAIRS));
-      return SEED_CURRENT_AFFAIRS;
-    }
-    return JSON.parse(data);
-  } catch (e) {
-    return SEED_CURRENT_AFFAIRS;
-  }
-};
+export const getAllCurrentAffairs = (): CurrentAffairsItem[] =>
+  readCachedStorage(STORAGE_KEYS.CURRENT_AFFAIRS, 'currentAffairs', SEED_CURRENT_AFFAIRS);
 
 export const saveCurrentAffairsPost = (post: Omit<CurrentAffairsItem, 'id'>): CurrentAffairsItem => {
-  const all = getAllCurrentAffairs();
-  const created: CurrentAffairsItem = {
-    ...post,
-    id: `ca-post-${Date.now()}`
-  };
-  const updated = [created, ...all];
-  localStorage.setItem(STORAGE_KEYS.CURRENT_AFFAIRS, JSON.stringify(updated));
-
-  safeApiCall('/api/current-affairs', {
-    method: 'POST',
-    body: JSON.stringify(created)
-  });
-
+  const created: CurrentAffairsItem = { ...post, id: `ca-post-${Date.now()}` };
+  writeStorage(STORAGE_KEYS.CURRENT_AFFAIRS, 'currentAffairs', [created, ...getAllCurrentAffairs()]);
+  safeApiCall('/api/current-affairs', { method: 'POST', body: JSON.stringify(created) });
   return created;
 };
 
 export const updateCurrentAffairsPost = (updatedPost: CurrentAffairsItem): void => {
-  const all: CurrentAffairsItem[] = getAllCurrentAffairs();
+  const all = getAllCurrentAffairs();
   const idx = all.findIndex(p => p.id === updatedPost.id);
-  if (idx >= 0) {
-    all[idx] = updatedPost;
-    localStorage.setItem(STORAGE_KEYS.CURRENT_AFFAIRS, JSON.stringify(all));
-    safeApiCall('/api/current-affairs', {
-      method: 'POST',
-      body: JSON.stringify(updatedPost)
-    });
-  }
+  if (idx < 0) return;
+
+  const next = [...all];
+  next[idx] = updatedPost;
+  writeStorage(STORAGE_KEYS.CURRENT_AFFAIRS, 'currentAffairs', next);
+  safeApiCall('/api/current-affairs', { method: 'POST', body: JSON.stringify(updatedPost) });
 };
 
 export const deleteCurrentAffairsPost = (id: string): void => {
-  const all = getAllCurrentAffairs().filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_KEYS.CURRENT_AFFAIRS, JSON.stringify(all));
+  const filtered = getAllCurrentAffairs().filter(p => p.id !== id);
+  writeStorage(STORAGE_KEYS.CURRENT_AFFAIRS, 'currentAffairs', filtered);
   safeApiCall(`/api/current-affairs/${id}`, { method: 'DELETE' });
 };
 
-// --- Current Affairs & Question Bookmarks ---
+// --- Bookmarks (Current Affairs & Question Bank) ---
 
-export const getCABookmarks = (): string[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.CA_BOOKMARKS);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
+const syncBookmarksToMongo = (caBookmarks: string[], questionBookmarks: string[]) => {
+  safeApiCall('/api/bookmarks', {
+    method: 'POST',
+    body: JSON.stringify({
+      userId: getUserProfile().id,
+      caBookmarks,
+      questionBookmarks
+    })
+  });
 };
 
+export const getCABookmarks = (): string[] =>
+  readCachedStorage(STORAGE_KEYS.CA_BOOKMARKS, 'caBookmarks', [], false);
+
+export const getQuestionBookmarks = (): string[] =>
+  readCachedStorage(STORAGE_KEYS.QUESTION_BOOKMARKS, 'questionBookmarks', [], false);
+
 export const toggleCABookmark = (caId: string): string[] => {
-  const bookmarks = getCABookmarks();
-  let updated: string[];
-  if (bookmarks.includes(caId)) {
-    updated = bookmarks.filter(id => id !== caId);
-  } else {
-    updated = [...bookmarks, caId];
-  }
-  localStorage.setItem(STORAGE_KEYS.CA_BOOKMARKS, JSON.stringify(updated));
+  const current = getCABookmarks();
+  const updated = current.includes(caId) ? current.filter(id => id !== caId) : [...current, caId];
+  writeStorage(STORAGE_KEYS.CA_BOOKMARKS, 'caBookmarks', updated);
+  syncBookmarksToMongo(updated, getQuestionBookmarks());
   return updated;
 };
 
-export const getQuestionBookmarks = (): string[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.QUESTION_BOOKMARKS);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
-};
-
 export const toggleQuestionBookmark = (questionId: string): string[] => {
-  const bookmarks = getQuestionBookmarks();
-  let updated: string[];
-  if (bookmarks.includes(questionId)) {
-    updated = bookmarks.filter(id => id !== questionId);
-  } else {
-    updated = [...bookmarks, questionId];
-  }
-  localStorage.setItem(STORAGE_KEYS.QUESTION_BOOKMARKS, JSON.stringify(updated));
+  const current = getQuestionBookmarks();
+  const updated = current.includes(questionId)
+    ? current.filter(id => id !== questionId)
+    : [...current, questionId];
+  writeStorage(STORAGE_KEYS.QUESTION_BOOKMARKS, 'questionBookmarks', updated);
+  syncBookmarksToMongo(getCABookmarks(), updated);
   return updated;
 };
 
 // --- Mock Tests CRUD ---
 
-export const getMockTests = (): MockTest[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.MOCK_TESTS);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEYS.MOCK_TESTS, JSON.stringify(INITIAL_MOCK_TESTS));
-      return INITIAL_MOCK_TESTS;
-    }
-    return JSON.parse(data);
-  } catch (e) {
-    console.error('Error reading mock tests from localStorage', e);
-    return INITIAL_MOCK_TESTS;
-  }
-};
+export const getMockTests = (): MockTest[] =>
+  readCachedStorage(STORAGE_KEYS.MOCK_TESTS, 'mockTests', INITIAL_MOCK_TESTS);
 
 export const saveMockTest = (test: MockTest): void => {
-  const all = getMockTests();
+  const all = [...getMockTests()];
   const existingIdx = all.findIndex(t => t.id === test.id);
   if (existingIdx >= 0) {
     all[existingIdx] = test;
   } else {
     all.unshift(test);
   }
-  localStorage.setItem(STORAGE_KEYS.MOCK_TESTS, JSON.stringify(all));
-
-  safeApiCall('/api/mock-tests', {
-    method: 'POST',
-    body: JSON.stringify(test)
-  });
+  writeStorage(STORAGE_KEYS.MOCK_TESTS, 'mockTests', all);
+  safeApiCall('/api/mock-tests', { method: 'POST', body: JSON.stringify(test) });
 };
 
 export const deleteMockTest = (id: string): void => {
-  const all = getMockTests().filter(t => t.id !== id);
-  localStorage.setItem(STORAGE_KEYS.MOCK_TESTS, JSON.stringify(all));
+  const filtered = getMockTests().filter(t => t.id !== id);
+  writeStorage(STORAGE_KEYS.MOCK_TESTS, 'mockTests', filtered);
   safeApiCall(`/api/mock-tests/${id}`, { method: 'DELETE' });
 };
 
-// --- Test Attempts & Performance ---
+// --- Test Attempts & Analytics ---
 
 export const getTestAttempts = (): TestAttempt[] => {
+  if (memoryCache.attempts) return memoryCache.attempts;
+
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.ATTEMPTS);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(SEED_TEST_ATTEMPTS));
+    const raw = localStorage.getItem(STORAGE_KEYS.ATTEMPTS);
+    if (!raw) {
+      writeStorage(STORAGE_KEYS.ATTEMPTS, 'attempts', SEED_TEST_ATTEMPTS);
       return SEED_TEST_ATTEMPTS;
     }
-    const parsed = JSON.parse(data);
+
+    const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(SEED_TEST_ATTEMPTS));
+      writeStorage(STORAGE_KEYS.ATTEMPTS, 'attempts', SEED_TEST_ATTEMPTS);
       return SEED_TEST_ATTEMPTS;
     }
+
     let migrated = false;
     const cleaned = parsed.map((att: TestAttempt) => {
-      if (att.studentName === 'Shivraj Gond' || att.studentName === 'Chris Anthony') {
+      if (LEGACY_STUDENT_NAMES.has(att.studentName)) {
         migrated = true;
         return { ...att, studentName: 'Rishabh', rollNo: '101' };
       }
       return att;
     });
+
     if (migrated) {
-      localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(cleaned));
+      writeStorage(STORAGE_KEYS.ATTEMPTS, 'attempts', cleaned);
+    } else {
+      memoryCache.attempts = cleaned;
     }
     return cleaned;
-  } catch (e) {
-    console.error('Error reading attempts from localStorage', e);
+  } catch {
+    memoryCache.attempts = SEED_TEST_ATTEMPTS;
     return SEED_TEST_ATTEMPTS;
   }
 };
 
 export const saveTestAttempt = (attempt: TestAttempt): void => {
-  const attempts = getTestAttempts();
   const user = getUserProfile();
-  const enhancedAttempt: TestAttempt = {
+  const enhanced: TestAttempt = {
     ...attempt,
     studentName: attempt.studentName || user.name,
     rollNo: attempt.rollNo || user.rollNo
   };
-  attempts.unshift(enhancedAttempt); // latest first
-  localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(attempts));
-
-  // Sync attempt to MongoDB Atlas
-  safeApiCall('/api/test-attempts', {
-    method: 'POST',
-    body: JSON.stringify(enhancedAttempt)
-  });
+  writeStorage(STORAGE_KEYS.ATTEMPTS, 'attempts', [enhanced, ...getTestAttempts()]);
+  safeApiCall('/api/test-attempts', { method: 'POST', body: JSON.stringify(enhanced) });
 };
 
 export const getUserStats = (): UserStats => {
@@ -415,22 +451,28 @@ export const getUserStats = (): UserStats => {
     };
   }
 
-  const totalTestsTaken = attempts.length;
-  const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + curr.attemptedQuestions, 0);
-  const totalAccuracySum = attempts.reduce((acc, curr) => acc + curr.accuracyPercentage, 0);
-  const averageAccuracy = Math.round(totalAccuracySum / attempts.length);
-  const highestScore = Math.max(...attempts.map(a => a.scoreMarks));
-  const testsPassed = attempts.filter(a => a.passedOverallCutoff || a.passedCategoryCutoff).length;
-  const totalSeconds = attempts.reduce((acc, curr) => acc + curr.totalTimeSeconds, 0);
-  const totalPracticeTimeMinutes = Math.round(totalSeconds / 60);
+  let totalQuestionsAttempted = 0;
+  let totalAccuracySum = 0;
+  let highestScore = -Infinity;
+  let testsPassed = 0;
+  let totalSeconds = 0;
+
+  for (let i = 0; i < attempts.length; i++) {
+    const att = attempts[i];
+    totalQuestionsAttempted += att.attemptedQuestions;
+    totalAccuracySum += att.accuracyPercentage;
+    if (att.scoreMarks > highestScore) highestScore = att.scoreMarks;
+    if (att.passedOverallCutoff || att.passedCategoryCutoff) testsPassed++;
+    totalSeconds += att.totalTimeSeconds;
+  }
 
   return {
-    totalTestsTaken,
+    totalTestsTaken: attempts.length,
     totalQuestionsAttempted,
-    averageAccuracy,
-    highestScore,
+    averageAccuracy: Math.round(totalAccuracySum / attempts.length),
+    highestScore: highestScore === -Infinity ? 0 : highestScore,
     testsPassed,
-    totalPracticeTimeMinutes,
+    totalPracticeTimeMinutes: Math.round(totalSeconds / 60),
     currentAffairsReadCount: Math.max(caBookmarks.length + 4, 8)
   };
 };
@@ -438,28 +480,66 @@ export const getUserStats = (): UserStats => {
 export const getAdminAnalytics = (): AdminAnalytics => {
   const attempts = getTestAttempts();
   const questions = getAllQuestions();
-  const ca = getAllCurrentAffairs();
+  const currentAffairs = getAllCurrentAffairs();
+  const mockTests = getMockTests();
+  const currentUser = getUserProfile();
 
-  const totalAttempts = Math.max(attempts.length, 24);
-  const avgScore = attempts.length > 0
-    ? Math.round(attempts.reduce((sum, a) => sum + a.accuracyPercentage, 0) / attempts.length)
-    : 72;
+  const distinctStudents = new Set<string>();
+  const examCounts: Record<string, number> = {};
+  let accuracySum = 0;
+  let completedCount = 0;
+
+  for (let i = 0; i < attempts.length; i++) {
+    const att = attempts[i];
+    const name = att.studentName?.trim();
+    if (name) distinctStudents.add(name);
+    accuracySum += att.accuracyPercentage;
+    if (att.attemptedQuestions > 0) completedCount++;
+    if (att.examCategory) {
+      examCounts[att.examCategory] = (examCounts[att.examCategory] || 0) + 1;
+    }
+  }
+
+  if (currentUser.role === 'student' && currentUser.name.trim()) {
+    distinctStudents.add(currentUser.name.trim());
+  }
+
+  const totalAttempts = attempts.length;
+  let topPerformingExam = 'No Attempts Yet';
+  let topCount = 0;
+  for (const [exam, count] of Object.entries(examCounts)) {
+    if (count > topCount) {
+      topCount = count;
+      topPerformingExam = exam;
+    }
+  }
 
   return {
-    totalStudents: 42,
+    totalStudents: Math.max(distinctStudents.size, 1),
     totalTestsAttempted: totalAttempts,
-    averageScorePercentage: avgScore,
-    topPerformingExam: 'UPSC Civil Services',
+    averageScorePercentage: totalAttempts > 0 ? Math.round(accuracySum / totalAttempts) : 0,
+    completionRatePercentage: totalAttempts > 0 ? Math.round((completedCount / totalAttempts) * 100) : 0,
+    topPerformingExam,
     totalQuestionsInBank: questions.length,
-    totalCurrentAffairsPosts: ca.length
+    totalCurrentAffairsPosts: currentAffairs.length,
+    totalMockTests: mockTests.length,
+    source: 'local'
   };
 };
 
+export const fetchLiveAdminAnalytics = async (): Promise<AdminAnalytics> => {
+  const res = await safeApiCall('/api/analytics');
+  return res?.connected && res?.analytics ? (res.analytics as AdminAnalytics) : getAdminAnalytics();
+};
+
 export const resetStorageToDefaults = (): void => {
-  localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(SEED_QUESTIONS));
-  localStorage.setItem(STORAGE_KEYS.MOCK_TESTS, JSON.stringify(INITIAL_MOCK_TESTS));
-  localStorage.setItem(STORAGE_KEYS.CURRENT_AFFAIRS, JSON.stringify(SEED_CURRENT_AFFAIRS));
-  localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(DEFAULT_USER_PROFILE));
+  writeStorage(STORAGE_KEYS.QUESTIONS, 'questions', SEED_QUESTIONS);
+  writeStorage(STORAGE_KEYS.MOCK_TESTS, 'mockTests', INITIAL_MOCK_TESTS);
+  writeStorage(STORAGE_KEYS.CURRENT_AFFAIRS, 'currentAffairs', SEED_CURRENT_AFFAIRS);
+  writeStorage(STORAGE_KEYS.USER_PROFILE, 'userProfile', DEFAULT_USER_PROFILE);
+  memoryCache.attempts = undefined;
+  memoryCache.caBookmarks = [];
+  memoryCache.questionBookmarks = [];
   localStorage.removeItem(STORAGE_KEYS.ATTEMPTS);
   localStorage.removeItem(STORAGE_KEYS.CA_BOOKMARKS);
   localStorage.removeItem(STORAGE_KEYS.QUESTION_BOOKMARKS);

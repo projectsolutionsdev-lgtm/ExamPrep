@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import { 
   UserProfile, 
   UserStats, 
@@ -17,23 +17,35 @@ import {
   getAllQuestions,
   getCABookmarks,
   getQuestionBookmarks,
-  saveTestAttempt
+  saveTestAttempt,
+  hydrateFromMongoDB
 } from './data/storage';
 
 import { Navbar } from './components/Navbar';
-import { LandingPage } from './components/LandingPage';
-import { LoginPage } from './components/LoginPage';
-import { HomeDashboard } from './components/HomeDashboard';
-import { CurrentAffairsModule } from './components/CurrentAffairsModule';
-import { MockTestPortal } from './components/MockTestPortal';
-import { ActiveTestInterface } from './components/ActiveTestInterface';
-import { ResultsAnalyticsView } from './components/ResultsAnalyticsView';
-import { TopicPracticeView } from './components/TopicPracticeView';
-import { BookmarksView } from './components/BookmarksView';
-import { UserProfileView } from './components/UserProfileView';
-import { AdminPortal } from './components/AdminPortal';
-import { AuthModal } from './components/AuthModal';
-import { ScorecardPrintModal } from './components/ScorecardPrintModal';
+
+// Lazy-load heavy views and modals to cut initial JS bundle and heap footprint
+const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+const LoginPage = lazy(() => import('./components/LoginPage').then(m => ({ default: m.LoginPage })));
+const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
+const CurrentAffairsModule = lazy(() => import('./components/CurrentAffairsModule').then(m => ({ default: m.CurrentAffairsModule })));
+const MockTestPortal = lazy(() => import('./components/MockTestPortal').then(m => ({ default: m.MockTestPortal })));
+const ActiveTestInterface = lazy(() => import('./components/ActiveTestInterface').then(m => ({ default: m.ActiveTestInterface })));
+const ResultsAnalyticsView = lazy(() => import('./components/ResultsAnalyticsView').then(m => ({ default: m.ResultsAnalyticsView })));
+const TopicPracticeView = lazy(() => import('./components/TopicPracticeView').then(m => ({ default: m.TopicPracticeView })));
+const BookmarksView = lazy(() => import('./components/BookmarksView').then(m => ({ default: m.BookmarksView })));
+const UserProfileView = lazy(() => import('./components/UserProfileView').then(m => ({ default: m.UserProfileView })));
+const AdminPortal = lazy(() => import('./components/AdminPortal').then(m => ({ default: m.AdminPortal })));
+const AuthModal = lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
+const ScorecardPrintModal = lazy(() => import('./components/ScorecardPrintModal').then(m => ({ default: m.ScorecardPrintModal })));
+
+const ViewFallback: React.FC = () => (
+  <div className="min-h-[45vh] flex items-center justify-center p-8">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 rounded-full border-3 border-amber-500 border-t-transparent animate-spin" />
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Loading module...</span>
+    </div>
+  </div>
+);
 
 export const App: React.FC = () => {
   // Page Flow State: Dedicated Landing Page -> Login Page -> Main Examination Portal
@@ -42,106 +54,146 @@ export const App: React.FC = () => {
   // Navigation & View State (within portal)
   const [activeTab, setActiveTab] = useState<'home' | 'ca' | 'mock' | 'practice' | 'analytics' | 'bookmarks' | 'profile' | 'admin'>('home');
   
-  // Data Entities
-  const [user, setUser] = useState<UserProfile>(getUserProfile());
-  const [stats, setStats] = useState<UserStats>(getUserStats());
-  const [currentAffairs, setCurrentAffairs] = useState<CurrentAffairsItem[]>(getAllCurrentAffairs());
-  const [mockTests, setMockTests] = useState<MockTest[]>(getMockTests());
-  const [questions, setQuestions] = useState<Question[]>(getAllQuestions());
-  const [attempts, setAttempts] = useState<TestAttempt[]>(getTestAttempts());
-  const [caBookmarkIds, setCaBookmarkIds] = useState<string[]>(getCABookmarks());
-  const [qBookmarkIds, setQBookmarkIds] = useState<string[]>(getQuestionBookmarks());
+  // Data Entities (lazy initializers prevent redundant localStorage reads/JSON.parse on every render)
+  const [user, setUser] = useState<UserProfile>(() => getUserProfile());
+  const [stats, setStats] = useState<UserStats>(() => getUserStats());
+  const [currentAffairs, setCurrentAffairs] = useState<CurrentAffairsItem[]>(() => getAllCurrentAffairs());
+  const [mockTests, setMockTests] = useState<MockTest[]>(() => getMockTests());
+  const [questions, setQuestions] = useState<Question[]>(() => getAllQuestions());
+  const [attempts, setAttempts] = useState<TestAttempt[]>(() => getTestAttempts());
+  const [caBookmarkIds, setCaBookmarkIds] = useState<string[]>(() => getCABookmarks());
+  const [qBookmarkIds, setQBookmarkIds] = useState<string[]>(() => getQuestionBookmarks());
 
   // Active Test State
   const [activeTest, setActiveTest] = useState<MockTest | null>(null);
   const [activeCandidateCategory, setActiveCandidateCategory] = useState<keyof CategoryCutoffs>('UR');
+  const [activeTimerMode, setActiveTimerMode] = useState<'overall' | 'sectional'>('overall');
 
   // Completed Test Attempt (for immediate Results view)
-  const [activeAttemptResult, setActiveAttemptResult] = useState<TestAttempt | null>(attempts[0] || null);
+  const [activeAttemptResult, setActiveAttemptResult] = useState<TestAttempt | null>(() => attempts[0] || null);
+
+  // Direct Article Deep-Link from Bookmarks
+  const [deepLinkedArticleId, setDeepLinkedArticleId] = useState<string | null>(null);
 
   // Modals
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [printableScorecardAttempt, setPrintableScorecardAttempt] = useState<TestAttempt | null>(null);
 
   // Reload all storage state
-  const reloadData = () => {
+  const reloadData = useCallback(() => {
     setUser(getUserProfile());
     setStats(getUserStats());
     setCurrentAffairs(getAllCurrentAffairs());
     setMockTests(getMockTests());
     setQuestions(getAllQuestions());
-    setAttempts(getTestAttempts());
+    const freshAttempts = getTestAttempts();
+    setAttempts(freshAttempts);
     setCaBookmarkIds(getCABookmarks());
     setQBookmarkIds(getQuestionBookmarks());
-  };
+    setActiveAttemptResult(prev => prev || freshAttempts[0] || null);
+  }, []);
+
+  // Full MongoDB Atlas Hydration on Startup
+  useEffect(() => {
+    let mounted = true;
+    hydrateFromMongoDB().then((hydrated) => {
+      if (hydrated && mounted) {
+        reloadData();
+      }
+    });
+    return () => { mounted = false; };
+  }, [reloadData]);
 
   // Launch Test
-  const handleStartTest = (test: MockTest, category: keyof CategoryCutoffs) => {
+  const handleStartTest = useCallback((
+    test: MockTest,
+    category: keyof CategoryCutoffs,
+    timerMode: 'overall' | 'sectional' = 'overall'
+  ) => {
     setActiveTest(test);
     setActiveCandidateCategory(category);
-  };
+    setActiveTimerMode(timerMode);
+  }, []);
 
   // Finish Test
-  const handleFinishTest = (attempt: TestAttempt) => {
+  const handleFinishTest = useCallback((attempt: TestAttempt) => {
     saveTestAttempt(attempt);
     setActiveAttemptResult(attempt);
     setActiveTest(null);
     reloadData();
     setActiveTab('analytics');
-  };
+  }, [reloadData]);
 
   // Exit Test
-  const handleExitTest = () => {
+  const handleExitTest = useCallback(() => {
     setActiveTest(null);
     setActiveTab('mock');
-  };
+  }, []);
 
   // Retake current test from analytics
-  const handleRetakeCurrentTest = () => {
+  const handleRetakeCurrentTest = useCallback(() => {
     if (!activeAttemptResult) return;
     const matchedTest = mockTests.find(t => t.id === activeAttemptResult.testId) || mockTests[0];
     if (matchedTest) {
       handleStartTest(matchedTest, activeAttemptResult.selectedCategory || 'UR');
     }
-  };
+  }, [activeAttemptResult, mockTests, handleStartTest]);
+
+  const currentAnalyticsAttempt = activeAttemptResult || attempts[0] || null;
+  const currentAnalyticsQuestions = useMemo(() => {
+    if (!currentAnalyticsAttempt) return [];
+    return (
+      mockTests.find(t => t.id === currentAnalyticsAttempt.testId)?.questions ||
+      questions.slice(0, currentAnalyticsAttempt.totalQuestions)
+    );
+  }, [currentAnalyticsAttempt, mockTests, questions]);
+
+  const clearDeepLinkedArticle = useCallback(() => setDeepLinkedArticleId(null), []);
 
   // 1. If in active testing session, render isolated full-screen test hall
   if (activeTest) {
     return (
-      <ActiveTestInterface
-        test={activeTest}
-        user={user}
-        selectedCategory={activeCandidateCategory}
-        onFinishTest={handleFinishTest}
-        onExitTest={handleExitTest}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <ActiveTestInterface
+          test={activeTest}
+          user={user}
+          selectedCategory={activeCandidateCategory}
+          timerMode={activeTimerMode}
+          onFinishTest={handleFinishTest}
+          onExitTest={handleExitTest}
+        />
+      </Suspense>
     );
   }
 
   // 2. Dedicated Landing Page
   if (currentPage === 'landing') {
     return (
-      <LandingPage
-        mockTests={mockTests}
-        onNavigateToLogin={() => setCurrentPage('login')}
-        onQuickExplore={() => setCurrentPage('portal')}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <LandingPage
+          mockTests={mockTests}
+          onNavigateToLogin={() => setCurrentPage('login')}
+          onQuickExplore={() => setCurrentPage('portal')}
+        />
+      </Suspense>
     );
   }
 
   // 3. Dedicated Login Page
   if (currentPage === 'login') {
     return (
-      <LoginPage
-        currentUser={user}
-        onLoginSuccess={(updated) => {
-          setUser(updated);
-          reloadData();
-          setCurrentPage('portal');
-        }}
-        onBackToLanding={() => setCurrentPage('landing')}
-        onGuestAccess={() => setCurrentPage('portal')}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <LoginPage
+          currentUser={user}
+          onLoginSuccess={(updated) => {
+            setUser(updated);
+            reloadData();
+            setCurrentPage('portal');
+          }}
+          onBackToLanding={() => setCurrentPage('landing')}
+          onGuestAccess={() => setCurrentPage('portal')}
+        />
+      </Suspense>
     );
   }
 
@@ -162,7 +214,7 @@ export const App: React.FC = () => {
 
       {/* Main Content View Switcher */}
       <main className="flex-1 pb-6 lg:pb-16">
-        
+        <Suspense fallback={<ViewFallback />}>
         {activeTab === 'home' && (
           <HomeDashboard
             user={user}
@@ -181,6 +233,8 @@ export const App: React.FC = () => {
             currentAffairs={currentAffairs}
             bookmarks={caBookmarkIds}
             onBookmarkChange={reloadData}
+            initialArticleId={deepLinkedArticleId}
+            onClearInitialArticle={clearDeepLinkedArticle}
           />
         )}
 
@@ -199,13 +253,10 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'analytics' && (
-          (activeAttemptResult || attempts[0]) ? (
+          currentAnalyticsAttempt ? (
             <ResultsAnalyticsView
-              attempt={activeAttemptResult || attempts[0]}
-              testQuestions={
-                mockTests.find(t => t.id === (activeAttemptResult || attempts[0]).testId)?.questions ||
-                questions.slice(0, (activeAttemptResult || attempts[0]).totalQuestions)
-              }
+              attempt={currentAnalyticsAttempt}
+              testQuestions={currentAnalyticsQuestions}
               user={user}
               allAttempts={attempts}
               allMockTests={mockTests}
@@ -218,7 +269,7 @@ export const App: React.FC = () => {
               }}
               onRetakeTest={handleRetakeCurrentTest}
               onBackToPortal={() => setActiveTab('mock')}
-              onOpenScorecardPrint={() => setPrintableScorecardAttempt(activeAttemptResult || attempts[0])}
+              onOpenScorecardPrint={() => setPrintableScorecardAttempt(currentAnalyticsAttempt)}
             />
           ) : (
             <div className="max-w-4xl mx-auto py-16 px-4 text-center space-y-4">
@@ -257,6 +308,7 @@ export const App: React.FC = () => {
             questionBookmarkIds={qBookmarkIds}
             onBookmarksUpdated={reloadData}
             onOpenArticle={(item) => {
+              setDeepLinkedArticleId(item.id);
               setActiveTab('ca');
             }}
           />
@@ -287,7 +339,7 @@ export const App: React.FC = () => {
             onDataChanged={reloadData}
           />
         )}
-
+        </Suspense>
       </main>
 
       {/* Footer */}
@@ -296,33 +348,37 @@ export const App: React.FC = () => {
           Competitive Exam and Current Affairs Mock Test Portal • Academic Year 2026-27
         </p>
         <p className="text-slate-600 dark:text-slate-400">
-          Nirmala Memorial Foundation College of Commerce and Science (Autonomous) • Department of Information Technology
+          Nirmala Memorial Foundation College of Commerce and Science (Autonomous) • Department of Computer Science
         </p>
         <p className="text-[11px] text-slate-500 dark:text-slate-500">
-          Department of Information Technology • Mock Test &amp; Assessment Platform
+          Department of Computer Science • B.Sc. CS Mock Test &amp; Assessment Platform
         </p>
       </footer>
 
 
       {/* Authentication Modal */}
       {isAuthModalOpen && (
-        <AuthModal
-          currentUser={user}
-          onClose={() => setIsAuthModalOpen(false)}
-          onProfileUpdated={(updated) => {
-            setUser(updated);
-            reloadData();
-          }}
-        />
+        <Suspense fallback={null}>
+          <AuthModal
+            currentUser={user}
+            onClose={() => setIsAuthModalOpen(false)}
+            onProfileUpdated={(updated) => {
+              setUser(updated);
+              reloadData();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Printable Scorecard Modal */}
       {printableScorecardAttempt && (
-        <ScorecardPrintModal
-          attempt={printableScorecardAttempt}
-          user={user}
-          onClose={() => setPrintableScorecardAttempt(null)}
-        />
+        <Suspense fallback={null}>
+          <ScorecardPrintModal
+            attempt={printableScorecardAttempt}
+            user={user}
+            onClose={() => setPrintableScorecardAttempt(null)}
+          />
+        </Suspense>
       )}
 
     </div>

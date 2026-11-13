@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Question, PracticeTopic, ExamCategory } from '../types';
 import { 
   Layers, 
@@ -26,12 +26,13 @@ export const TopicPracticeView: React.FC<TopicPracticeViewProps> = ({ questions 
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [userSelectedOption, setUserSelectedOption] = useState<string | null>(null);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState<boolean>(false);
-  const [practiceBookmarks, setPracticeBookmarks] = useState<string[]>(getQuestionBookmarks());
+  const [practiceBookmarks, setPracticeBookmarks] = useState<string[]>(() => getQuestionBookmarks());
+  const practiceBookmarkSet = useMemo(() => new Set(practiceBookmarks), [practiceBookmarks]);
 
-  const topics = [
+  const topics = useMemo(() => [
     'All',
     ...Array.from(new Set(questions.map(q => q.topic).filter(Boolean)))
-  ];
+  ], [questions]);
 
   const examCategories = [
     'All',
@@ -43,11 +44,13 @@ export const TopicPracticeView: React.FC<TopicPracticeViewProps> = ({ questions 
     'Railways (RRB NTPC/Group D)'
   ];
 
-  const filteredQuestions = questions.filter(q => {
-    const matchesTopic = selectedTopic === 'All' || q.topic === selectedTopic;
-    const matchesExam = selectedExamCategory === 'All' || q.examCategory === selectedExamCategory;
-    return matchesTopic && matchesExam;
-  });
+  const filteredQuestions = useMemo(() => {
+    return questions.filter(q => {
+      const matchesTopic = selectedTopic === 'All' || q.topic === selectedTopic;
+      const matchesExam = selectedExamCategory === 'All' || q.examCategory === selectedExamCategory;
+      return matchesTopic && matchesExam;
+    });
+  }, [questions, selectedTopic, selectedExamCategory]);
 
   const currentQ: Question | undefined = filteredQuestions[currentIdx];
 
@@ -185,13 +188,13 @@ export const TopicPracticeView: React.FC<TopicPracticeViewProps> = ({ questions 
               <button
                 onClick={() => handleToggleBookmark(currentQ.id)}
                 className={`p-2 rounded-xl border transition-colors ${
-                  practiceBookmarks.includes(currentQ.id)
+                  practiceBookmarkSet.has(currentQ.id)
                     ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
                     : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750'
                 }`}
                 title="Bookmark for Revision Deck"
               >
-                <Bookmark className={`w-4 h-4 ${practiceBookmarks.includes(currentQ.id) ? 'fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400' : ''}`} />
+                <Bookmark className={`w-4 h-4 ${practiceBookmarkSet.has(currentQ.id) ? 'fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400' : ''}`} />
               </button>
             </div>
           </div>

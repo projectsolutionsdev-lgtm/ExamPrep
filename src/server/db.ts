@@ -74,7 +74,6 @@ export const getDBStatus = () => {
 
 const TestAttemptSchema = new Schema({
   id: { type: String, required: true, unique: true, index: true },
-  sessionId: { type: String, index: true },
   testId: { type: String, required: true },
   testTitle: { type: String, required: true },
   examCategory: { type: String, required: true },
@@ -103,7 +102,6 @@ const TestAttemptSchema = new Schema({
 
 const UserProfileSchema = new Schema({
   id: { type: String, required: true, unique: true, index: true },
-  sessionId: { type: String },
   name: { type: String, required: true },
   rollNo: { type: String, required: true },
   className: { type: String, required: true },
@@ -114,7 +112,9 @@ const UserProfileSchema = new Schema({
   avatar: { type: String, default: '' },
   role: { type: String, enum: ['student', 'admin'], default: 'student' },
   streakDays: { type: Number, default: 1 },
-  lastActiveDate: { type: String }
+  lastActiveDate: { type: String },
+  caBookmarks: { type: [String], default: [] },
+  questionBookmarks: { type: [String], default: [] }
 }, {
   timestamps: true
 });

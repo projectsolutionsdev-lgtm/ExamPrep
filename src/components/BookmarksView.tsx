@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CurrentAffairsItem, Question } from '../types';
 import { 
   Bookmark, 
@@ -37,8 +37,17 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [revealedSolutions, setRevealedSolutions] = useState<Record<string, boolean>>({});
 
-  const savedCAs = currentAffairs.filter(ca => caBookmarkIds.includes(ca.id));
-  const savedQuestions不易 = questions.filter(q => questionBookmarkIds.includes(q.id));
+  const caBookmarkSet = useMemo(() => new Set(caBookmarkIds), [caBookmarkIds]);
+  const questionBookmarkSet = useMemo(() => new Set(questionBookmarkIds), [questionBookmarkIds]);
+
+  const savedCAs = useMemo(
+    () => currentAffairs.filter(ca => caBookmarkSet.has(ca.id)),
+    [currentAffairs, caBookmarkSet]
+  );
+  const savedQuestions = useMemo(
+    () => questions.filter(q => questionBookmarkSet.has(q.id)),
+    [questions, questionBookmarkSet]
+  );
 
   const handleRemoveCA = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -55,17 +64,25 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
     setRevealedSolutions(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const filteredCAs = savedCAs.filter(ca => 
-    ca.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ca.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ca.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const normalizedSearch = searchTerm.trim().toLowerCase();
 
-  const filteredQuestions = savedQuestions不易.filter(q =>
-    q.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.examCategory.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCAs = useMemo(() => {
+    if (!normalizedSearch) return savedCAs;
+    return savedCAs.filter(ca =>
+      ca.title.toLowerCase().includes(normalizedSearch) ||
+      ca.summary.toLowerCase().includes(normalizedSearch) ||
+      ca.category.toLowerCase().includes(normalizedSearch)
+    );
+  }, [savedCAs, normalizedSearch]);
+
+  const filteredQuestions = useMemo(() => {
+    if (!normalizedSearch) return savedQuestions;
+    return savedQuestions.filter(q =>
+      q.text.toLowerCase().includes(normalizedSearch) ||
+      q.topic.toLowerCase().includes(normalizedSearch) ||
+      q.examCategory.toLowerCase().includes(normalizedSearch)
+    );
+  }, [savedQuestions, normalizedSearch]);
 
   return (
     <div id="revision-deck-container" className="max-w-7xl mx-auto py-5 sm:py-8 px-3.5 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 transition-colors duration-200">
@@ -89,7 +106,7 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-center">
             <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Saved Items</span>
             <span className="text-2xl font-black text-amber-800 dark:text-amber-400 font-mono">
-              {savedCAs.length + savedQuestions不易.length}
+              {savedCAs.length + savedQuestions.length}
             </span>
           </div>
         </div>
@@ -121,7 +138,7 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
             }`}
           >
             <HelpCircle className="w-4 h-4 shrink-0" />
-            <span>Question Bank ({savedQuestions不易.length})</span>
+            <span>Question Bank ({savedQuestions.length})</span>
           </button>
         </div>
 
