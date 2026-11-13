@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Exact User Requested Light Theme Palette (Clean & Focused) */
+  --bg-page: #F8FAFC;
+  --bg-page-alt: #F4F4F5;
+  --bg-card: #FFFFFF;
+  --border-card: #E4E4E7;
+  --text-primary: #18181B;
+  --text-muted: #71717A;
+  --accent-passion: #EA580C;
+  --accent-passion-hover: #C2410C;
+  --accent-passion-text: #FFFFFF;
+  --accent-passion-subtle: #FFF7ED;
+
+  /* Tailwind CSS Token Bindings (Light) */
+  --color-slate-50: #F8FAFC;
+  --color-slate-100: #F4F4F5;
+  --color-slate-200: #E4E4E7;
+  --color-slate-300: #D4D4D8;
+  --color-slate-400: #A1A1AA;
+  --color-slate-500: #71717A;
+  --color-slate-600: #52525B;
+  --color-slate-700: #3F3F46;
+  --color-slate-800: #27272A;
+  --color-slate-900: #18181B;
+  --color-slate-950: #18181B;
+
+  --color-amber-50: #FFF7ED;
+  --color-amber-100: #FFEDD5;
+  --color-amber-200: #FED7AA;
+  --color-amber-300: #FDBA74;
+  --color-amber-400: #FB923C;
+  --color-amber-500: #EA580C;
+  --color-amber-600: #C2410C;
+  --color-amber-700: #9A3412;
+  --color-amber-800: #7C2D12;
+  --color-amber-900: #431407;
+  --color-amber-950: #271007;
+
+  --color-orange-500: #EA580C;
+  --color-orange-400: #FB923C;
+}
+
+.dark,
+html.dark,
+:root.dark {
+  /* Exact User Requested Dark Theme Palette (Sleek & Eye-Friendly) */
+  --bg-page: #121212;
+  --bg-page-alt: #18181B;
+  --bg-card: #1E1E22;
+  --border-card: #27272A;
+  --text-primary: #F4F4F5;
+  --text-muted: #A1A1AA;
+  --accent-passion: #FB923C;
+  --accent-passion-hover: #F97316;
+  --accent-passion-text: #18181B;
+  --accent-passion-subtle: #27150A;
+
+  /* Tailwind CSS Token Bindings (Dark) */
+  --color-slate-50: #F8FAFC;
+  --color-slate-100: #F4F4F5;
+  --color-slate-200: #E4E4E7;
+  --color-slate-300: #D4D4D8;
+  --color-slate-400: #A1A1AA;
+  --color-slate-500: #71717A;
+  --color-slate-600: #52525B;
+  --color-slate-700: #3F3F46;
+  --color-slate-800: #27272A;
+  --color-slate-900: #1E1E22;
+  --color-slate-950: #121212;
+
+  --color-amber-300: #FDBA74;
+  --color-amber-400: #FB923C;
+  --color-amber-500: #FB923C;
+  --color-amber-600: #EA580C;
+  --color-amber-800: #FB923C;
+  --color-amber-900: #F4F4F5;
+  --color-amber-950: #27150A;
+
+  --color-orange-500: #FB923C;
+  --color-orange-400: #FB923C;
+}
+
+@theme {
+  --color-page-light: #F8FAFC;
+  --color-page-dark: #121212;
+  --color-card-light: #FFFFFF;
+  --color-card-dark: #1E1E22;
+  --color-border-light: #E4E4E7;
+  --color-border-dark: #27272A;
+  --color-text-light: #18181B;
+  --color-text-dark: #F4F4F5;
+  --color-muted-light: #71717A;
+  --color-muted-dark: #A1A1AA;
+  --color-passion-light: #EA580C;
+  --color-passion-dark: #FB923C;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+@layer base {
+  html {
+    overflow-x: clip;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark body,
+  body.dark,
+  html.dark body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
+}
+
+/* Hide scrollbars on horizontal filter rails cleanly */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tabular numerals for precision timers */
+.tabular-timer {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Primary Passion Action Button Utility */
+.btn-passion {
+  background-color: var(--accent-passion);
+  color: var(--accent-passion-text);
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.btn-passion:hover {
+  filter: brightness(0.95);
+}
+
+.dark .btn-passion {
+  background-color: #FB923C;
+  color: #18181B;
+}
+
+.dark .btn-passion:hover {
+  background-color: #F97316;
+}
