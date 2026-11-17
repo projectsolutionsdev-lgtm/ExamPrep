@@ -95,9 +95,12 @@ const readCachedStorage = <K extends keyof StorageCache>(
   }
 };
 
+const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+
 const safeApiCall = async (url: string, options?: RequestInit) => {
   try {
-    const res = await fetch(url, {
+    const targetUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+    const res = await fetch(targetUrl, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

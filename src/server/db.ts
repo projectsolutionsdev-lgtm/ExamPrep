@@ -29,8 +29,10 @@ export const connectToMongoDB = async (): Promise<boolean> => {
     try {
       lastError = null;
       
-      // Connect to MongoDB Atlas with optimized pool and timeout settings
+      // Connect to MongoDB Atlas with explicit database name (defaults to My_Db) and pool settings
+      const dbName = process.env.MONGODB_DB_NAME || 'My_Db';
       await mongoose.connect(uri, {
+        dbName,
         serverSelectionTimeoutMS: 5000,
         connectTimeoutMS: 10000,
         maxPoolSize: 10,
